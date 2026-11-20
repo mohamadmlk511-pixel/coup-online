@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>لعبة Coup أونلاين</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    background: radial-gradient(ellipse at center, #14532d 0%, #0b3d20 55%, #062e16 100%);
+    color: #f5f0dc;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  #app { height: 100dvh; display: flex; flex-direction: column; }
+  .hidden { display: none !important; }
+  button {
+    font-family: inherit; cursor: pointer; border: none; border-radius: 10px;
+    padding: 9px 12px; font-size: 15px; font-weight: 700; color: #1a1a1a;
+    background: linear-gradient(180deg, #f6d365, #d4a017); box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    transition: transform .05s, filter .15s;
+  }
+  button:active { transform: scale(.97); }
+  button:disabled { filter: grayscale(.8) brightness(.6); cursor: not-allowed; }
+  button.ghost { background: rgba(255,255,255,.12); color: #f5f0dc; border: 1px solid rgba(255,255,255,.35); box-shadow: none; }
+  button.danger { background: linear-gradient(180deg, #ff8a7a, #c0392b); color: #fff; }
+  button.blue { background: linear-gradient(180deg, #7cc4ff, #2470c2); color: #fff; }
+  input {
+    font-family: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; width: 100%;
+  }
+  input::placeholder { color: rgba(255,255,255,.5); }
+
+  /* ---------- lobby ---------- */
+  #lobby { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; overflow: hidden; }
+  #lobby h1 { font-size: 34px; color: #f6d365; text-shadow: 0 3px 10px rgba(0,0,0,.6); }
+  #lobby .sub { opacity: .85; font-size: 14px; text-align: center; }
+  .lobby-card { background: rgba(0,0,0,.35); border: 1px solid rgba(246,211,101,.35); border-radius: 16px; padding: 16px; width: min(420px, 94vw); display: flex; flex-direction: column; gap: 10px; }
+  .lobby-card h2 { font-size: 17px; color: #f6d365; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  #roomLobby .code { font-size: 30px; letter-spacing: 6px; text-align: center; color: #f6d365; font-weight: 800; }
+  #playerList { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  #playerList li { background: rgba(255,255,255,.08); border-radius: 8px; padding: 7px 10px; display: flex; justify-content: space-between; font-size: 15px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-inline-end: 6px; }
+  .dot.on { background: #2ecc71; } .dot.off { background: #e74c3c; }
+
+  /* ---------- game layout: ONE screen, no scrolling ---------- */
+  #game { flex: 1; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+  #topbar {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: rgba(0,0,0,.4); border-bottom: 1px solid rgba(246,211,101,.3); font-size: 14px;
+  }
+  #topbar .spacer { flex: 1; }
+  #topbar button { padding: 6px 10px; font-size: 13px; }
+  #roomCodeLbl { color: #f6d365; font-weight: 800; letter-spacing: 2px; }
+  #opponents { display: flex; gap: 8px; padding: 8px; flex-wrap: nowrap; overflow: hidden; justify-content: center; }
+  .opp {
+    flex: 1 1 0; max-width: 170px; min-width: 0; background: rgba(0,0,0,.35);
+    border: 2px solid rgba(255,255,255,.15); border-radius: 12px; padding: 6px 8px; text-align: center;
+  }
+  .opp.turn { border-color: #f6d365; box-shadow: 0 0 12px rgba(246,211,101,.55); }
+  .opp.dead { opacity: .45; filter: grayscale(.7); }
+  .opp.targetable { cursor: pointer; border-color: #7cc4ff; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 14px rgba(124,196,255,.8); } }
+  .opp .nm { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opp .cn { color: #f6d365; font-size: 13px; font-weight: 700; }
+  .opp .cards { display: flex; gap: 4px; justify-content: center; margin-top: 4px; min-height: 30px; }
+  .mini {
+    width: 26px; height: 36px; border-radius: 5px; font-size: 9px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.1;
+    border: 1px solid rgba(255,255,255,.4); color: #fff; padding: 1px;
+  }
+  .mini.back { background: repeating-linear-gradient(45deg, #5b2a86, #5b2a86 5px, #472169 5px, #472169 10px); color: #f6d365; font-size: 13px; }
+  .mini.img { object-fit: cover; padding: 0; background: #1c1c22; }
+  .mini.dead { opacity: .55; text-decoration: line-through; }
+  #center {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 4px 12px; min-height: 74px; text-align: center;
+  }
+  #announce { font-size: clamp(15px, 2.6vw, 20px); font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+  #revealBox { font-size: 14px; color: #ffe9a8; }
+  #ringWrap { position: relative; width: 64px; height: 64px; flex: 0 0 auto; }
+  #ringWrap svg { transform: rotate(-90deg); }
+  #ringNum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; }
+  #ringWrap.urgent #ringNum { color: #ff6b5e; }
+  #logStrip {
+    flex: 0 0 auto; max-height: 40px; overflow: hidden; padding: 3px 12px; font-size: 12px;
+    color: rgba(255,255,255,.75); background: rgba(0,0,0,.25); border-block: 1px solid rgba(255,255,255,.08);
+    white-space: nowrap; text-overflow: ellipsis;
+  }
+  #meStrip {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 6px 12px;
+    background: rgba(0,0,0,.35); border-top: 1px solid rgba(246,211,101,.35);
+  }
+  #meStrip .who { font-weight: 800; }
+  #meStrip .cn { color: #f6d365; font-weight: 800; font-size: 17px; }
+  #myCards { display: flex; gap: 8px; }
+  .card {
+    width: 62px; height: 86px; border-radius: 9px; border: 2px solid rgba(255,255,255,.5);
+    overflow: hidden; padding: 0; background: #1c1c22; flex: 0 0 auto;
+    box-shadow: 0 3px 8px rgba(0,0,0,.5); user-select: none;
+  }
+  .card img.face { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #cardStrip { display: flex; gap: 6px; justify-content: center; flex-wrap: nowrap; }
+  #cardStrip img { height: 92px; width: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,.5); border: 1px solid rgba(246,211,101,.4); }
+  .card.dead { opacity: .4; filter: grayscale(.8); }
+  .card.pickable { cursor: pointer; animation: pulse 1s infinite; border-color: #ff8a7a; }
+  .card.selected { outline: 3px solid #f6d365; transform: translateY(-5px); }
+  .r-duke { background: linear-gradient(160deg, #8e44ad, #5e2a84); }
+  .r-assassin { background: linear-gradient(160deg, #2c3e50, #0f1a24); }
+  .r-ambassador { background: linear-gradient(160deg, #1e9e6a, #0f6b43); }
+  .r-captain { background: linear-gradient(160deg, #2470c2, #123f73); }
+  .r-contessa { background: linear-gradient(160deg, #c0392b, #7c1f14); }
+  #panel {
+    flex: 1 1 auto; overflow: hidden; padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; align-items: stretch;
+    background: rgba(0,0,0,.18);
+  }
+  #panel .hint { text-align: center; font-size: 15px; font-weight: 700; color: #ffe9a8; }
+  #panel .wait { text-align: center; font-size: 15px; opacity: .85; padding-top: 8px; }
+  .btnGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .btnGrid button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 4px; font-size: 15px; }
+  .btnGrid button small { font-weight: 600; font-size: 11px; opacity: .75; }
+  .btnRow { display: flex; gap: 8px; }
+  .btnRow > * { flex: 1; }
+  #toast {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50;
+    background: #c0392b; color: #fff; padding: 9px 16px; border-radius: 10px; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); max-width: 92vw; text-align: center;
+  }
+  @media (max-height: 560px) {
+    .card { width: 50px; height: 68px; }
+    #center { min-height: 56px; }
+    #logStrip { display: none; }
+    #cardStrip { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======== LOBBY ======== -->
+  <section id="lobby">
+    <h1>🎭 Coup أونلاين</h1>
+    <div class="sub">لعبة الخداع والبطاقات — العب ويا أصدقائك من أي مكان، ويا محادثة صوتية</div>
+    <div id="cardStrip">
+      <img src="/assets/card-duke.webp" alt="الدوق">
+      <img src="/assets/card-assassin.webp" alt="القاتل">
+      <img src="/assets/card-ambassador.webp" alt="السفير">
+      <img src="/assets/card-captain.webp" alt="القائد">
+      <img src="/assets/card-contessa.webp" alt="الكونتيسة">
+    </div>
+
+    <div class="lobby-card" id="entryCard">
+      <h2>اسمك باللعبة</h2>
+      <input id="nameInput" type="text" maxlength="20" placeholder="مثال: علي">
+      <button id="createBtn">➕ إنشاء غرفة جديدة</button>
+      <div class="row">
+        <input id="codeInput" type="text" maxlength="4" placeholder="كود الغرفة" style="text-transform:uppercase; text-align:center; letter-spacing:4px;">
+        <button id="joinBtn" class="blue">دخول غرفة</button>
+      </div>
+      <div class="sub" id="inviteHint"></div>
+    </div>
+
+    <div class="lobby-card hidden" id="roomLobby">
+      <h2 style="text-align:center;">كود الغرفة — دزّ الرابط لأصدقائك</h2>
+      <div class="code" id="roomCodeShow">----</div>
+      <button id="copyLinkBtn" class="ghost">🔗 نسخ رابط الدعوة</button>
+      <ul id="playerList"></ul>
+      <button id="startBtn">▶️ بدء اللعبة</button>
+      <div class="sub" id="lobbyWait"></div>
+    </div>
+  </section>
+
+  <!-- ======== GAME (single screen, no scrolling) ======== -->
+  <section id="game" class="hidden">
+    <header id="topbar">
+      <span>غرفة <span id="roomCodeLbl">----</span></span>
+      <button id="copyLinkBtn2" class="ghost">🔗 دعوة</button>
+      <span class="spacer"></span>
+      <button id="micBtn" class="ghost">🎤 المايك: مطفي</button>
+      <button id="sndBtn" class="ghost">🔊 الصوت</button>
+    </header>
+    <div id="opponents"></div>
+    <div id="center">
+      <div>
+        <div id="announce">…</div>
+        <div id="revealBox"></div>
+      </div>
+      <div id="ringWrap" class="hidden">
+        <svg width="64" height="64">
+          <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="6"/>
+          <circle id="ringFg" cx="32" cy="32" r="27" fill="none" stroke="#f6d365" stroke-width="6"
+                  stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="0"/>
+        </svg>
+        <div id="ringNum">30</div>
+      </div>
+    </div>
+    <div id="logStrip"></div>
+    <div id="meStrip">
+      <div>
+        <div class="who" id="myNameLbl">أنت</div>
+        <div class="cn">🪙 <span id="myCoins">2</span></div>
+      </div>
+      <div id="myCards"></div>
+    </div>
+    <div id="panel"></div>
+  </section>
+</div>
+
+<div id="toast" class="hidden"></div>
+<div id="audios" class="hidden"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+/* ================= identity & reconnection ================= */
+let token = localStorage.getItem('coup_token');
+if (!token) {
+  token = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : 't' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('coup_token', token);
+}
+const savedRoom = localStorage.getItem('coup_room') || '';
+const urlRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+
+const ROLE_AR = { duke: 'الدوق', assassin: 'القاتل', ambassador: 'السفير', captain: 'القائد', contessa: 'الكونتيسة' };
+const ROLE_EN = { duke: 'Duke', assassin: 'Assassin', ambassador: 'Ambassador', captain: 'Captain', contessa: 'Contessa' };
+const ROLE_IC = { duke: '👑', assassin: '🗡️', ambassador: '🕊️', captain: '⚓', contessa: '💃' };
+const CAP = 9;
+
+const $ = id => document.getElementById(id);
+const socket = io();
+let state = null;
+let inRoom = false;
+let selectedAction = null;   // action waiting for a target pick
+let exchangeSel = new Set();  // card ids chosen to keep
+let lastLogId = 0;
+let wasMyTurn = false;
+let endPlayed = false;
+let sndOn = localStorage.getItem('coup_snd') !== '0';
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.add('hidden'), 3200);
+}
+
+/* ================= Web Audio sound effects (synthesized, no files) ================= */
+let AC = null;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay, slideTo) {
+  const ctx = ac(); if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.15, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g).connect(ctx.destination);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function noiseBurst(dur, vol, delay, freq) {
+  const ctx = ac(); if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq || 1200; f.Q.value = 0.8;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol || 0.15, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start(t0);
+}
+const SFX = {
+  coins() { [1318, 1568, 2093].forEach((f, i) => tone(f, 0.09, 'triangle', 0.16, i * 0.055)); },
+  tick(urgent) { tone(urgent ? 1500 : 940, 0.045, 'square', 0.05); },
+  stab() { noiseBurst(0.12, 0.25, 0, 2600); tone(620, 0.22, 'sawtooth', 0.14, 0, 90); },
+  boom() { tone(165, 0.5, 'sine', 0.3, 0, 38); noiseBurst(0.4, 0.18, 0, 300); },
+  shuffle() { [0, 0.13, 0.26].forEach(d => noiseBurst(0.09, 0.12, d, 1800)); },
+  bell() { tone(880, 0.4, 'triangle', 0.18); tone(1318, 0.3, 'sine', 0.09, 0.02); },
+  shield() { tone(220, 0.14, 'square', 0.13); tone(332, 0.2, 'square', 0.1, 0.05); noiseBurst(0.08, 0.08, 0, 3200); },
+  cardlose() { tone(392, 0.25, 'sine', 0.16); tone(311, 0.38, 'sine', 0.16, 0.17); },
+  eliminate() { [523, 415, 349, 262].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.1, i * 0.16)); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.24, 'triangle', 0.17, i * 0.12)); },
+  lose() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.27, 'triangle', 0.16, i * 0.14)); },
+  turn() { tone(784, 0.12, 'sine', 0.13); tone(1046, 0.18, 'sine', 0.13, 0.1); }
+};
+function playSfx(name) {
+  if (!sndOn || !name || !SFX[name]) return;
+  try { SFX[name](); } catch (e) {}
+}
+
+/* ================= lobby wiring ================= */
+$('nameInput').value = localStorage.getItem('coup_name') || '';
+if (urlRoom) {
+  $('codeInput').value = urlRoom;
+  $('inviteHint').textContent = 'وصلت من رابط دعوة — اكتب اسمك واضغط «دخول غرفة»';
+}
+function myName() {
+  const n = $('nameInput').value.trim();
+  if (n) localStorage.setItem('coup_name', n);
+  return n;
+}
+$('createBtn').onclick = () => {
+  const n = myName();
+  if (!n) { toast('اكتب اسمك أولاً'); return; }
+  ac();
+  socket.emit('createRoom', { name: n, token });
+};
+$('joinBtn').onclick = () => {
+  const n = myName();
+  const code = $('codeInput').value.trim().toUpperCase();
+  if (!n) { toast('اكتب اسمك أولاً'); return; }
+  if (!code) { toast('اكتب كود الغرفة'); return; }
+  ac();
+  socket.emit('joinRoom', { name: n, token, code });
+};
+function inviteLink() { return location.origin + '/?room=' + (state ? state.code : ($('codeInput').value || '')); }
+function copyLink() {
+  const link = inviteLink();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => toast('اننسخ رابط الدعوة ✔️ دزّه لأصدقائك')).catch(() => toast(link));
+  } else toast(link);
+}
+$('copyLinkBtn').onclick = copyLink;
+$('copyLinkBtn2').onclick = copyLink;
+$('startBtn').onclick = () => socket.emit('startGame');
+$('sndBtn').onclick = () => {
+  sndOn = !sndOn;
+  localStorage.setItem('coup_snd', sndOn ? '1' : '0');
+  $('sndBtn').textContent = sndOn ? '🔊 الصوت' : '🔇 صامت';
+  if (sndOn) playSfx('turn');
+};
+if (!sndOn) $('sndBtn').textContent = '🔇 صامت';
+
+socket.on('connect', () => {
+  // restore seat after any reconnect — server keeps the seat and window deadlines
+  const code = (state && state.code) || savedRoom || urlRoom;
+  if (code) socket.emit('rejoin', { token, code });
+});
+socket.on('joined', ({ code }) => {
+  inRoom = true;
+  localStorage.setItem('coup_room', code);
+});
+socket.on('rejoinFailed', () => {
+  if (!state) localStorage.removeItem('coup_room');
+});
+socket.on('errorMsg', msg => toast(msg));
+
+/* ================= rendering ================= */
+const CARD_IMG = role => '/assets/card-' + role + '.webp';
+function cardHTML(c, extraCls, attrs) {
+  const img = c.img || CARD_IMG(c.role);
+  return `<div class="card ${extraCls || ''} ${c.revealed ? 'dead' : ''}" ${attrs || ''} title="${ROLE_AR[c.role]}">
+    <img class="face" src="${img}" alt="${ROLE_AR[c.role]}"></div>`;
+}
+function render() {
+  if (!state) return;
+  const inGame = state.phase === 'playing' || state.phase === 'finished';
+  $('lobby').classList.toggle('hidden', inGame);
+  $('game').classList.toggle('hidden', !inGame);
+
+  if (!inGame) {
+    // room lobby
+    $('entryCard').classList.toggle('hidden', inRoom);
+    $('roomLobby').classList.toggle('hidden', !inRoom);
+    if (inRoom) {
+      $('roomCodeShow').textContent = state.code;
+      $('playerList').innerHTML = state.players.map(p =>
+        `<li><span><span class="dot ${p.connected ? 'on' : 'off'}"></span>${p.name}${p.id === state.myToken ? ' (أنت)' : ''}</span><span>${p.isHost ? '👑 المضيف' : ''}${p.voice ? ' 🎤' : ''}</span></li>`).join('');
+      $('startBtn').style.display = state.isHost ? '' : 'none';
+      $('startBtn').disabled = state.players.length < 2;
+      $('lobbyWait').textContent = state.isHost
+        ? (state.players.length < 2 ? 'انتظر ينضم لاعب ثاني على الأقل' : 'جاهزين! اضغط بدء اللعبة')
+        : 'بانتظار المضيف يبدي اللعبة…';
+    }
+    return;
+  }
+
+  /* --- game screen --- */
+  $('roomCodeLbl').textContent = state.code;
+  const others = state.players.filter(p => p.id !== state.myToken);
+  $('opponents').innerHTML = others.map(p => {
+    const cards = p.cards.map(c => c.revealed
+      ? `<img class="mini img dead" src="${c.img || CARD_IMG(c.role)}" alt="${ROLE_AR[c.role]}" title="${ROLE_AR[c.role]}">`
+      : `<div class="mini back">؟</div>`).join('');
+    const targetable = selectedAction && p.alive && state.myTurn;
+    return `<div class="opp ${p.isTurn ? 'turn' : ''} ${p.alive ? '' : 'dead'} ${targetable ? 'targetable' : ''}" data-target="${p.id}">
+      <div class="nm">${p.name}${p.connected ? '' : ' 🔴'}</div>
+      <div class="cn">🪙 ${p.coins}${p.voice ? ' 🎤' : ''}${p.alive ? '' : ' 💀'}</div>
+      <div class="cards">${cards}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.opp.targetable').forEach(el => {
+    el.onclick = () => { doAction(selectedAction, el.dataset.target); };
+  });
+
+  $('announce').textContent = state.announce || '';
+  $('revealBox').textContent = state.reveal
+    ? (state.reveal.ok ? `👀 ${state.reveal.name} كشف: ${ROLE_AR[state.reveal.role]} ✔️` : `👀 ${state.reveal.name} ما عنده ${ROLE_AR[state.reveal.role]} ✖️`)
+    : '';
+
+  const me = state.players.find(p => p.id === state.myToken);
+  $('myNameLbl').textContent = (me ? me.name : 'أنت') + (state.turnId === state.myToken && state.phase === 'playing' ? ' — دورك!' : '');
+  $('myCoins').textContent = state.me.coins;
+  const loseMine = state.lose && state.lose.mine;
+  $('myCards').innerHTML = state.me.cards.map(c => {
+    const pickable = loseMine && !c.revealed;
+    return cardHTML(c, pickable ? 'pickable' : '', `data-card="${c.id}"`);
+  }).join('');
+  if (loseMine) {
+    document.querySelectorAll('#myCards .card.pickable').forEach(el => {
+      el.onclick = () => socket.emit('loseCard', { cardId: Number(el.dataset.card) });
+    });
+  }
+
+  $('logStrip').textContent = state.log.length ? state.log[state.log.length - 1].text : '';
+
+  renderPanel();
+  updateRing();
+
+  // sounds for fresh log entries
+  for (const e of state.log) {
+    if (e.id > lastLogId) {
+      lastLogId = e.id;
+      if (e.sfx && e.sfx !== 'end') playSfx(e.sfx);
+    }
+  }
+  if (state.phase === 'finished' && !endPlayed) {
+    endPlayed = true;
+    playSfx(state.winnerToken === state.myToken ? 'win' : 'lose');
+  }
+  if (state.phase === 'playing') endPlayed = false;
+  if (state.myTurn && !wasMyTurn) playSfx('turn');
+  wasMyTurn = !!state.myTurn;
+}
+
+/* ================= action panel ================= */
+function doAction(type, targetId) {
+  selectedAction = null;
+  socket.emit('action', { type, target: targetId || undefined });
+  render();
+}
+function renderPanel() {
+  const panel = $('panel');
+  const s = state;
+
+  if (s.phase === 'finished') {
+    panel.innerHTML = `<div class="hint">🏆 ${s.winner} فاز باللعبة!</div>` +
+      (s.isHost
+        ? `<div class="btnRow"><button onclick="socket.emit('restart')">🔄 لعبة جديدة</button></div>`
+        : `<div class="wait">بانتظار المضيف يبدي لعبة جديدة…</div>`);
+    return;
+  }
+
+  // Ambassador exchange — my private choice, NO time limit
+  if (s.exchange && s.exchange.mine) {
+    const ex = s.exchange;
+    panel.innerHTML = `<div class="hint">🔄 اختر ${ex.keepCount} بطاقة تبقّيها عندك (بدون حدّ وقتي)</div>
+      <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        ${ex.hand.map(c => cardHTML(c, exchangeSel.has(c.id) ? 'selected' : '', `data-ex="${c.id}" style="cursor:pointer;"`)).join('')}
+      </div>
+      <div class="btnRow"><button id="exConfirm" ${exchangeSel.size === ex.keepCount ? '' : 'disabled'}>✔️ تأكيد التبديل</button></div>`;
+    panel.querySelectorAll('[data-ex]').forEach(el => {
+      el.onclick = () => {
+        const id = Number(el.dataset.ex);
+        if (exchangeSel.has(id)) exchangeSel.delete(id);
+        else if (exchangeSel.size < ex.keepCount) exchangeSel.add(id);
+        renderPanel();
+      };
+    });
+    const btn = $('exConfirm');
+    if (btn) btn.onclick = () => {
+      socket.emit('exchangeKeep', { keepIds: [...exchangeSel] });
+      exchangeSel = new Set();
+    };
+    return;
+  }
+  if (s.exchange) {
+    panel.innerHTML = `<div class="wait">🔄 ${s.exchange.name} يبدّل بطاقاته…</div>`;
+    return;
+  }
+
+  // losing an influence — NO time limit
+  if (s.lose) {
+    panel.innerHTML = s.lose.mine
+      ? `<div class="hint">💔 لازم تخسر بطاقة — اضغط على وحدة من بطاقاتك فوق (بدون حدّ وقتي)</div>`
+      : `<div class="wait">💔 ${s.lose.name} يختار بطاقة ليخسرها…</div>`;
+    return;
+  }
+
+  // response windows (30s, server deadline)
+  const w = s.window;
+  if (w) {
+    if (w.eligible && !w.myResponse) {
+      if (w.kind === 'challenge' || w.kind === 'blockChallenge') {
+        const what = w.kind === 'challenge'
+          ? `${w.claimBy} ادّعى ${ROLE_AR[w.claim]}`
+          : `${w.claimBy} ادّعى ${ROLE_AR[w.blockClaim]} للمنع`;
+        panel.innerHTML = `<div class="hint">⏱️ ${what} — تتحدّاه لو تمرّر؟</div>
+          <div class="btnRow">
+            <button class="danger" id="btnChallenge">⚔️ أتحدّى</button>
+            <button class="ghost" id="btnPass">➡️ أمرّر</button>
+          </div>`;
+        $('btnChallenge').onclick = () => socket.emit('respond', { response: 'challenge' });
+        $('btnPass').onclick = () => socket.emit('respond', { response: 'pass' });
+      } else if (w.kind === 'block') {
+        const claimBtns = w.claims.map(c =>
+          `<button id="blk-${c}">🛡️ أمنع بـ${ROLE_AR[c]}</button>`).join('');
+        panel.innerHTML = `<div class="hint">⏱️ ${w.targetName}، أنت الهدف — تمنع لو تسمح؟</div>
+          <div class="btnRow">${claimBtns}<button class="ghost" id="btnAllow">أسمح</button></div>`;
+        w.claims.forEach(c => {
+          $('blk-' + c).onclick = () => socket.emit('respond', { response: 'block', blockClaim: c });
+        });
+        $('btnAllow').onclick = () => socket.emit('respond', { response: 'pass' });
+      }
+    } else {
+      panel.innerHTML = `<div class="wait">⏱️ نافذة ردّ مفتوحة (${w.passedCount}/${w.eligibleCount} مرّروا) — بانتظار الباقين أو انتهاء الـ٣٠ ثانية…</div>`;
+    }
+    return;
+  }
+
+  // my turn — NO time limit
+  if (s.myTurn) {
+    if (selectedAction) {
+      const names = { steal: 'السرقة', assassinate: 'الاغتيال', coup: 'الانقلاب' };
+      const targets = s.players.filter(p => p.id !== s.myToken && p.alive);
+      panel.innerHTML = `<div class="hint">🎯 اختر هدف ${names[selectedAction]} — من الأزرار أو اضغط على لاعب من فوك</div>
+        <div class="btnRow">${targets.map(p => `<button data-tgt="${p.id}">${p.name} (🪙 ${p.coins})</button>`).join('')}</div>
+        <div class="btnRow"><button class="ghost" id="btnCancel">إلغاء</button></div>`;
+      panel.querySelectorAll('[data-tgt]').forEach(b => { b.onclick = () => doAction(selectedAction, b.dataset.tgt); });
+      $('btnCancel').onclick = () => { selectedAction = null; render(); };
+      return;
+    }
+    const coins = s.me.coins;
+    const cap = coins >= CAP;
+    const dis = (cond) => cond ? 'disabled' : '';
+    panel.innerHTML = `
+      ${cap ? `<div class="hint">🪙 عندك ٩ نقاط (الحد الأقصى) — لازم تلعب ببطاقة أو تسوي انقلاب</div>` : ''}
+      <div class="btnGrid">
+        <button data-act="income" ${dis(cap)}>💰 الدخل<small>+1 نقطة</small></button>
+        <button data-act="tax" ${dis(cap)}>👑 الضريبة<small>الدوق · +3</small></button>
+        <button data-act="steal" ${dis(cap)}>⚓ السرقة<small>القائد · من لاعب</small></button>
+        <button data-act="assassinate" ${dis(coins < 3)}>🗡️ الاغتيال<small>القاتل · ٣ نقاط</small></button>
+        <button data-act="exchange">🕊️ التبديل<small>السفير · ويا المجموعة</small></button>
+        <button data-act="coup" ${dis(coins < 7)}>💥 الانقلاب<small>٧ نقاط · على لاعب</small></button>
+      </div>`;
+    panel.querySelectorAll('[data-act]').forEach(b => {
+      b.onclick = () => {
+        const t = b.dataset.act;
+        ac();
+        if (['steal', 'assassinate', 'coup'].includes(t)) { selectedAction = t; render(); }
+        else doAction(t);
+      };
+    });
+    return;
+  }
+
+  panel.innerHTML = `<div class="wait">⏳ دور ${s.turnName || '…'} — انتظر دورك (الأدوار العادية بدون حدّ وقتي)</div>`;
+}
+
+/* ================= countdown ring (driven by the SERVER deadline) ================= */
+let lastTickSec = -1;
+function updateRing() {
+  const wrap = $('ringWrap');
+  if (!state || !state.window) {
+    wrap.classList.add('hidden');
+    lastTickSec = -1;
+    return;
+  }
+  wrap.classList.remove('hidden');
+  tickRing();
+}
+function tickRing() {
+  if (!state || !state.window) return;
+  const remain = Math.max(0, state.window.deadline - Date.now());
+  const sec = Math.ceil(remain / 1000);
+  $('ringNum').textContent = sec;
+  $('ringFg').style.strokeDashoffset = String(169.6 * (1 - remain / 30000));
+  $('ringFg').style.stroke = sec <= 5 ? '#ff6b5e' : '#f6d365';
+  $('ringWrap').classList.toggle('urgent', sec <= 5);
+  if (sec !== lastTickSec && remain > 0) {
+    lastTickSec = sec;
+    if (sndOn) { try { SFX.tick(sec <= 5); } catch (e) {} }
+  }
+}
+setInterval(tickRing, 100);
+
+/* ================= voice chat (WebRTC mesh, free STUN only) ================= */
+let localStream = null;
+let voiceOn = false;
+const pcs = {};
+const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+function updateMicBtn() {
+  $('micBtn').textContent = voiceOn ? '🎤 المايك: شغّال' : '🎤 المايك: مطفي';
+  $('micBtn').style.borderColor = voiceOn ? '#2ecc71' : '';
+}
+function closePeer(peerId) {
+  if (pcs[peerId]) { try { pcs[peerId].close(); } catch (e) {} delete pcs[peerId]; }
+  const el = $('au-' + peerId);
+  if (el) el.remove();
+}
+function connectTo(peerId, initiate) {
+  if (pcs[peerId] || peerId === token) return pcs[peerId];
+  const pc = new RTCPeerConnection(STUN);
+  pcs[peerId] = pc;
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.ontrack = e => {
+    let el = $('au-' + peerId);
+    if (!el) {
+      el = document.createElement('audio');
+      el.id = 'au-' + peerId;
+      el.autoplay = true;
+      $('audios').appendChild(el);
+    }
+    el.srcObject = e.streams[0];
+  };
+  pc.onicecandidate = e => {
+    if (e.candidate) socket.emit('voiceIce', { to: peerId, candidate: e.candidate });
+  };
+  if (initiate) {
+    pc.createOffer()
+      .then(o => pc.setLocalDescription(o))
+      .then(() => socket.emit('voiceOffer', { to: peerId, sdp: pc.localDescription }))
+      .catch(() => {});
+  }
+  return pc;
+}
+$('micBtn').onclick = async () => {
+  if (voiceOn) {
+    voiceOn = false;
+    socket.emit('voiceOff');
+    Object.keys(pcs).forEach(closePeer);
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    updateMicBtn();
+    return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    toast('ما گدرنا نوصل للمايك — تأكد أنك منطي إذن المايكروفون');
+    return;
+  }
+  voiceOn = true;
+  socket.emit('voiceOn');
+  updateMicBtn();
+  // I just joined voice => I initiate offers to everyone already in voice
+  if (state) state.players.forEach(p => { if (p.id !== token && p.voice) connectTo(p.id, true); });
+};
+socket.on('voicePeerOn', ({ playerId }) => {
+  // the newcomer initiates offers to us; nothing to do here
+});
+socket.on('voicePeerOff', ({ playerId }) => closePeer(playerId));
+socket.on('voiceOffer', async ({ from, sdp }) => {
+  if (!voiceOn) return;
+  try {
+    const pc = connectTo(from, false);
+    await pc.setRemoteDescription(sdp);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    socket.emit('voiceAnswer', { to: from, sdp: pc.localDescription });
+  } catch (e) {}
+});
+socket.on('voiceAnswer', async ({ from, sdp }) => {
+  const pc = pcs[from];
+  if (pc) { try { await pc.setRemoteDescription(sdp); } catch (e) {} }
+});
+socket.on('voiceIce', async ({ from, candidate }) => {
+  const pc = pcs[from];
+  if (pc && candidate) { try { await pc.addIceCandidate(candidate); } catch (e) {} }
+});
+
+/* ================= state stream ================= */
+socket.on('state', (s) => {
+  state = s;
+  inRoom = true;
+  localStorage.setItem('coup_room', s.code);
+  render();
+});
+document.addEventListener('pointerdown', () => { if (sndOn) ac(); }, { once: true });
+</script>
+</body>
+</html>
